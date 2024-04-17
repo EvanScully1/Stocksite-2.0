@@ -5,6 +5,7 @@ import com.example.application.views.MainLayout;
 import com.example.application.views.search.ServiceHealth.Status;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.board.Board;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.charts.Chart;
 import com.vaadin.flow.component.charts.model.*;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
@@ -19,7 +20,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
@@ -30,6 +31,18 @@ import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 import com.vaadin.flow.theme.lumo.LumoUtility.Margin;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 import com.vaadin.flow.theme.lumo.LumoUtility.TextColor;
+import com.vaadin.flow.component.charts.model.ChartType;
+import com.vaadin.flow.component.charts.model.Configuration;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import javax.swing.*;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 @PageTitle("Search")
 @Route(value = "dashboard", layout = MainLayout.class)
@@ -37,17 +50,108 @@ import com.vaadin.flow.theme.lumo.LumoUtility.TextColor;
 @AnonymousAllowed
 public class SearchView extends Main {
 
+    private String ticker = "AAPL";
+    private ArrayList<Double> openPricesList;
+    private ArrayList<Double> highPricesList;
+    private ArrayList<Double> lowPricesList;
+    private ArrayList<ListSeries> stockChartList;
+
     public SearchView() {
+        Board board = new Board();
+
+        TextField stockTickerTF = new TextField();
+        stockTickerTF.getElement().setAttribute("title", "example: AAPL is Apple's ticker");
+        stockTickerTF.setClearButtonVisible(true);
+        stockTickerTF.setMinLength(1);
+        stockTickerTF.setMaxLength(5);
+        stockTickerTF.setPattern("^[A-Z]+");
+        stockTickerTF.setErrorMessage("Not a ticker symbol.");
+        stockTickerTF.setWidth("min-content");
+        stockTickerTF.setPlaceholder("ticker symbol");
+        stockTickerTF.setErrorMessage("Not a ticker symbol.");
+        stockTickerTF.setWidth("min-content");
+
+        add(stockTickerTF);
+        Button searchButton = new Button();
+
+        add(searchButton);
+
+        // POLYGON.IO STOCK AGG PRICE API RESPONSE
+        try {
+            String apiKey = "CI7FYHBhYMeJSFiRsCHP0yNLcIb3Bqhw";
+//            String apiUrl = "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-09/2023-01-09?apiKey="+apiKey;
+//            String apiUrl = "https://api.polygon.io/v3/reference/options/contracts?underlying_ticker="+ticker+"&apiKey="+apiKey;
+            String apiUrl = "https://api.polygon.io/v2/aggs/ticker/"+ticker+"/range/1/day/2021-01-09/2023-01-09?adjusted=true&sort=asc&limit=5000&apiKey="+apiKey;
+
+            URL url = new URL(apiUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            // Set the request method
+            connection.setRequestMethod("GET");
+            // Get the response code
+            //int responseCode = connection.getResponseCode();
+            //System.out.println("Response Code: " + responseCode);
+            // Read the response
+            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String line;
+            StringBuilder response = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+
+            // Close the reader and connection
+            reader.close();
+            connection.disconnect();
+
+
+            // Print the response(s)
+            String data = response.toString();
+            System.out.println("Response: " + data);
+
+            JSONObject jsonObject = new JSONObject(data);
+            JSONArray results = jsonObject.getJSONArray("results");
+            //access each 'o' value in results
+            openPricesList = new ArrayList<Double>();
+            highPricesList = new ArrayList<Double>();
+            lowPricesList = new ArrayList<Double>();
+            for(int i = 0; i < results.length(); i++) {
+                JSONObject result = results.getJSONObject(i);
+
+                double openPrice = result.getDouble("o");
+                openPricesList.add(openPrice);
+                double highPrice = result.getDouble("h");
+                highPricesList.add(highPrice);
+                double lowPrice = result.getDouble("l");
+                lowPricesList.add(lowPrice);
+
+//                System.out.println(i + ", "+ openPrice); // for testing purposes
+            }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         addClassName("search-view");
 
-        Board board = new Board();
-        board.addRow(createHighlight("Current users", "745", 33.7), createHighlight("View events", "54.6k", -112.45),
-                createHighlight("Conversion rate", "18%", 3.9), createHighlight("Custom metric", "-123.45", 0.0));
+        board.addRow(createHighlight("Ticker Symbol", ticker),
+                createHighlight("Current", openPricesList.get(openPricesList.size()-1).toString(), 33.7),
+                createHighlight("High", highPricesList.get(highPricesList.size()-1).toString(), -112.45),
+                createHighlight("Low", lowPricesList.get(lowPricesList.size()-1).toString(), 3.9));
         board.addRow(createViewEvents());
-        board.addRow(createServiceHealth(), createResponseTimes());
+//        board.addRow(createServiceHealth(), createResponseTimes());
         add(board);
-    }
 
+
+
+//        TextfieldSubject searchSubject = new TextfieldSubject();
+//        ValueUpdater searchValUpdater = new ValueUpdater();
+//        searchSubject.addObserver(searchValUpdater);
+//        searchButton.addClickListener(e -> {
+//            searchSubject.setValue(stockTickerTF.getValue(), rangeWidthTF.getValue(), minDateTF.getValue(), maxDateTF.getValue());
+//            currChart.setVisible(true);
+//            conf.setTitle(stockTickerTF.getValue());
+//            conf.setSubTitle(rangeWidthTF.getValue());
+//        });
+    }
     private Component createHighlight(String title, String value, Double percentage) {
         VaadinIcon icon = VaadinIcon.ARROW_UP;
         String prefix = "";
@@ -82,14 +186,35 @@ public class SearchView extends Main {
         return layout;
     }
 
+    private Component createHighlight(String title, String subtitle) {
+        VaadinIcon icon = VaadinIcon.ARROW_UP;
+        String prefix = "";
+        String theme = "badge";
+
+        H2 h2 = new H2(title);
+        h2.addClassNames(FontWeight.NORMAL, Margin.NONE, TextColor.SECONDARY, FontSize.XSMALL);
+
+        Span span = new Span(subtitle);
+        span.addClassNames(FontWeight.SEMIBOLD, FontSize.XXXLARGE);
+
+        Icon i = icon.create();
+        i.addClassNames(BoxSizing.BORDER, Padding.XSMALL);
+
+        VerticalLayout layout = new VerticalLayout(h2, span);
+        layout.addClassName(Padding.LARGE);
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        return layout;
+    }
+
     private Component createViewEvents() {
         // Header
         Select year = new Select();
         year.setItems("2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021");
-        year.setValue("2021");
-        year.setWidth("100px");
+        year.setValue("Max Year");
+        year.setWidth("200px");
 
-        HorizontalLayout header = createHeader("View events", "City/month");
+        HorizontalLayout header = createHeader("Chart","");
         header.add(year);
 
         // Chart
@@ -98,20 +223,29 @@ public class SearchView extends Main {
         conf.getChart().setStyledMode(true);
 
         XAxis xAxis = new XAxis();
-        xAxis.setCategories("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
+//        xAxis.setCategories("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
         conf.addxAxis(xAxis);
 
-        conf.getyAxis().setTitle("Values");
+        conf.getyAxis().setTitle("Price (USD)");
 
         PlotOptionsAreaspline plotOptions = new PlotOptionsAreaspline();
         plotOptions.setPointPlacement(PointPlacement.ON);
         plotOptions.setMarker(new Marker(false));
         conf.addPlotOptions(plotOptions);
 
-        conf.addSeries(new ListSeries("Berlin", 189, 191, 291, 396, 501, 403, 609, 712, 729, 942, 1044, 1247));
-        conf.addSeries(new ListSeries("London", 138, 246, 248, 348, 352, 353, 463, 573, 778, 779, 885, 887));
-        conf.addSeries(new ListSeries("New York", 65, 65, 166, 171, 293, 302, 308, 317, 427, 429, 535, 636));
-        conf.addSeries(new ListSeries("Tokyo", 0, 11, 17, 123, 130, 142, 248, 349, 452, 454, 458, 462));
+
+        // add a new stock to the list series that will appear as a chart and a little icon below chart on web app.
+        // How to add a basic one: conf.addSeries(new ListSeries("test", 189.1, 191.1, 291.4, 396, 501, 403, 609, 712, 729, 942, 1044, 1247));
+        ListSeries temp = new ListSeries(ticker);
+
+        for(int i = 0; i<openPricesList.size(); i++) {
+            temp.addData(openPricesList.get(i));
+        }
+        stockChartList = new ArrayList<ListSeries>();
+        stockChartList.add(temp);
+        for(int i=0; i<stockChartList.size(); i++) {
+            conf.addSeries(stockChartList.get(i));
+        }
 
         // Add it all together
         VerticalLayout viewEvents = new VerticalLayout(header, chart);
@@ -122,6 +256,7 @@ public class SearchView extends Main {
         return viewEvents;
     }
 
+    /*
     private Component createServiceHealth() {
         // Header
         HorizontalLayout header = createHeader("Service health", "Input / output");
@@ -183,14 +318,17 @@ public class SearchView extends Main {
         serviceHealth.getElement().getThemeList().add("spacing-l");
         return serviceHealth;
     }
-
+    */
     private HorizontalLayout createHeader(String title, String subtitle) {
         H2 h2 = new H2(title);
         h2.addClassNames(FontSize.XLARGE, Margin.NONE);
 
         Span span = new Span(subtitle);
-        span.addClassNames(TextColor.SECONDARY, FontSize.XSMALL);
-
+        if(subtitle.equals("")) {
+            span.addClassNames(TextColor.SECONDARY, FontSize.XXSMALL);
+        } else {
+            span.addClassNames(TextColor.SECONDARY, FontSize.SMALL);
+        }
         VerticalLayout column = new VerticalLayout(h2, span);
         column.setPadding(false);
         column.setSpacing(false);
