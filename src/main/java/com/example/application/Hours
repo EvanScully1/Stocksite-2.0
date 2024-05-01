@@ -31,6 +31,10 @@ Hours:
 
 Total time: 31 + XX hours
 
+Questions:
+- minYear and maxYear selection -- should I set up an observer for when the user click
+
+
 {
     "ticker": "AAPL",
     "queryCount": 120,

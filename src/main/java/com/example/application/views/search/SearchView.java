@@ -2,12 +2,17 @@ package com.example.application.views.search;
 
 
 import com.example.application.views.MainLayout;
+import com.example.application.views.favorites.Client;
+import com.example.application.views.favorites.FavoritesView;
 import com.example.application.views.search.ServiceHealth.Status;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.charts.model.OhlcItem;
 import com.vaadin.flow.component.board.Board;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.charts.Chart;
 import com.vaadin.flow.component.charts.model.*;
+import com.vaadin.flow.component.charts.model.style.SolidColor;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -16,11 +21,15 @@ import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.textfield.Autocapitalize;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
@@ -35,14 +44,19 @@ import com.vaadin.flow.component.charts.model.ChartType;
 import com.vaadin.flow.component.charts.model.Configuration;
 import org.json.JSONArray;
 import org.json.JSONObject;
-
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.router.Route;
 import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import java.lang.reflect.Array;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+import java.text.DecimalFormat;
+import java.util.*;
 
 @PageTitle("Search")
 @Route(value = "dashboard", layout = MainLayout.class)
@@ -50,13 +64,23 @@ import java.util.List;
 @AnonymousAllowed
 public class SearchView extends Main {
 
-    private String ticker = "AAPL";
-    private ArrayList<Double> openPricesList;
-    private ArrayList<Double> highPricesList;
-    private ArrayList<Double> lowPricesList;
-    private ArrayList<ListSeries> stockChartList;
+    private String ticker;
+    private final ArrayList<HashMap<String, Object>> listOfMapData = new ArrayList<>();
+    private final ArrayList listOfCharts = new ArrayList();
+    private ArrayList<String> timeStampList;
+    private String minYear;
+    private String maxYear;
+    double lastOpenPrice;
+    double maxHighPrice;
+    double maxLowPrice;
+//    private Checkbox favoriteCheckBox;
+    private Button favoriteButton;
 
     public SearchView() {
+        VerticalLayout verticalLayout = new VerticalLayout();
+        verticalLayout.setDefaultHorizontalComponentAlignment(FlexComponent.Alignment.CENTER);
+
+        // set up Board for layout, and add ticker search box and button
         Board board = new Board();
 
         TextField stockTickerTF = new TextField();
@@ -67,100 +91,133 @@ public class SearchView extends Main {
         stockTickerTF.setPattern("^[A-Z]+");
         stockTickerTF.setErrorMessage("Not a ticker symbol.");
         stockTickerTF.setWidth("min-content");
-        stockTickerTF.setPlaceholder("ticker symbol");
-        stockTickerTF.setErrorMessage("Not a ticker symbol.");
-        stockTickerTF.setWidth("min-content");
+        stockTickerTF.setPlaceholder("enter");
+        stockTickerTF.setWidth("35%");
+        stockTickerTF.setLabel("Ticker Symbol");
 
-        add(stockTickerTF);
-        Button searchButton = new Button();
+        Button searchButton = new Button("Search");
+        searchButton.getElement().setAttribute("title", "Search");
+        Button clearButton = new Button("Clear");
+        clearButton.getElement().setAttribute("title", "Clear");
 
-        add(searchButton);
+        // max year selection
+        Select maxYear = new Select();
+        maxYear.setItems("2022", "2023", "2024");
+        maxYear.setValue("Max Year");
+        maxYear.setLabel("Max Year");
+        maxYear.setWidth("35%");
+        // min year selection
+        Select minYear = new Select();
+        minYear.setItems("2022", "2023", "2024");
+        minYear.setValue("Min Year");
+        minYear.setLabel("Min Year");
+        minYear.setWidth("35%");
 
-        // POLYGON.IO STOCK AGG PRICE API RESPONSE
-        try {
-            String apiKey = "CI7FYHBhYMeJSFiRsCHP0yNLcIb3Bqhw";
-//            String apiUrl = "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-09/2023-01-09?apiKey="+apiKey;
-//            String apiUrl = "https://api.polygon.io/v3/reference/options/contracts?underlying_ticker="+ticker+"&apiKey="+apiKey;
-            String apiUrl = "https://api.polygon.io/v2/aggs/ticker/"+ticker+"/range/1/day/2021-01-09/2023-01-09?adjusted=true&sort=asc&limit=5000&apiKey="+apiKey;
+        // check if minYear's seelction is greater than maxYears' and visa-versa to throw error messge.
 
-            URL url = new URL(apiUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            // Set the request method
-            connection.setRequestMethod("GET");
-            // Get the response code
-            //int responseCode = connection.getResponseCode();
-            //System.out.println("Response Code: " + responseCode);
-            // Read the response
-            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String line;
-            StringBuilder response = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
+        // Create a HorizontalLayout for text field and select tools
+        HorizontalLayout textFieldLayout = new HorizontalLayout();
+        textFieldLayout.add(stockTickerTF, maxYear, minYear);
+        textFieldLayout.setSpacing(true);
+
+        // Create a HorizontalLayout for text field and select tools
+        HorizontalLayout textFieldLayout2 = new HorizontalLayout();
+        textFieldLayout2.add(searchButton, clearButton);
+        textFieldLayout2.setSpacing(true);
+
+        verticalLayout.add(board, textFieldLayout, textFieldLayout2);
+        add(verticalLayout);
+
+        // when button is pressed, run this Lambda function
+        searchButton.addClickListener(e -> {
+
+            TextfieldSubject searchSubject = new TextfieldSubject();
+            ValueUpdater valUpdater = new ValueUpdater();
+            searchSubject.addObserver(valUpdater);
+            this.minYear = minYear.getValue().toString();
+            this.maxYear = maxYear.getValue().toString();
+
+            // setValue in TextfieldSubject calls notifyObservers which then calls update in ValueUpdater.
+            // The update method in ValueUpdater receives an API response based on the text-field input.
+            searchSubject.setValue(stockTickerTF.getValue(), this.minYear, this.maxYear);
+
+            // get API data from update in Value Updater and add it to a list in SearchView
+            listOfMapData.add(valUpdater.getMapData());
+
+            // get the max/min value from the data
+            this.maxHighPrice = ((ArrayList<Double>)listOfMapData.get(0).get("highPricesList")).stream().mapToDouble(Double::doubleValue).max().orElse(Double.NaN);
+            this.maxLowPrice = ((ArrayList<Double>)listOfMapData.get(0).get("lowPricesList")).stream().mapToDouble(Double::doubleValue).min().orElse(Double.NaN);
+            this.lastOpenPrice = ((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).get(((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).size() - 1);
+
+            ArrayList<Long> tempTimeList = valUpdater.getTimestampList();
+            timeStampList = new ArrayList<>();
+            for (Long timeStamp : tempTimeList) {
+                // tempTimeList.get(i) is of type Long
+                // unixConverter(tempTimeList.get(i)) returns a String
+                this.timeStampList.add(unixConverter(timeStamp));
             }
+            // initialize df for formatting -> max two decimals
+            DecimalFormat df = new DecimalFormat("#.##");
+            board.addRow(
+                    createHighlight("Ticker Symbol", String.valueOf(listOfMapData.get(0).get("ticker"))),
+                    // get the most recent open price by finding the last value (size()-1) in the list
+                    createHighlight("Last Open", String.valueOf(((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).get(((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).size() - 1)),
+                            Double.parseDouble(df.format((((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).get(((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).size() - 1)) - (((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).get(((ArrayList<Double>)listOfMapData.get(0).get("openPricesList")).size() - 2))))),
+                    // get the max value in valUpdater.getHighPricesList()
+                    createHighlight("High", String.valueOf(maxHighPrice)),
+                    // get the min value in valUpdater.getLowPricesList()
+                    createHighlight("Low", String.valueOf(maxLowPrice))
+            );
+            // create favorite check box when chart is created and ticker is searched.
+//            favoriteCheckBox = new Checkbox("Favorite");
+            favoriteButton = new Button("Favorite");
 
-            // Close the reader and connection
-            reader.close();
-            connection.disconnect();
+            VerticalLayout checkBoxLayout = new VerticalLayout(favoriteButton);
+            checkBoxLayout.setDefaultHorizontalComponentAlignment(FlexComponent.Alignment.CENTER);
+            addToFavorites();
 
+            board.addRow(checkBoxLayout);
+            // board.addRow(createViewEvents(valUpdater.getOpenPricesList(), valUpdater.getResponseList()));
+            board.addRow(createViewEvents((ArrayList<Double>) listOfMapData.get(0).get("openPricesList")));
+            // board.addRow(createServiceHealth(), createResponseTimes());
 
-            // Print the response(s)
-            String data = response.toString();
-            System.out.println("Response: " + data);
-
-            JSONObject jsonObject = new JSONObject(data);
-            JSONArray results = jsonObject.getJSONArray("results");
-            //access each 'o' value in results
-            openPricesList = new ArrayList<Double>();
-            highPricesList = new ArrayList<Double>();
-            lowPricesList = new ArrayList<Double>();
-            for(int i = 0; i < results.length(); i++) {
-                JSONObject result = results.getJSONObject(i);
-
-                double openPrice = result.getDouble("o");
-                openPricesList.add(openPrice);
-                double highPrice = result.getDouble("h");
-                highPricesList.add(highPrice);
-                double lowPrice = result.getDouble("l");
-                lowPricesList.add(lowPrice);
-
-//                System.out.println(i + ", "+ openPrice); // for testing purposes
-            }
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        addClassName("search-view");
-
-        board.addRow(createHighlight("Ticker Symbol", ticker),
-                createHighlight("Current", openPricesList.get(openPricesList.size()-1).toString(), 33.7),
-                createHighlight("High", highPricesList.get(highPricesList.size()-1).toString(), -112.45),
-                createHighlight("Low", lowPricesList.get(lowPricesList.size()-1).toString(), 3.9));
-        board.addRow(createViewEvents());
-//        board.addRow(createServiceHealth(), createResponseTimes());
+        });
         add(board);
+        // when clear button is hit, clear the current chart and data info on the screen.
+        clearButton.addClickListener(e -> {
+            // if there is something in listOfMapData, remove it. If not, show a message on the vaadin web app to show that you can't do that.
+            if(!listOfMapData.isEmpty()) {
+                listOfMapData.remove(0);
+            } else {
+                Notification n = new Notification("Nothing to Clear!");
+                n.open();
+            }
+//            if(chartComponent )
+            System.out.println("LIST OF MAP DATA:" + listOfMapData);
+        });
 
+        // NEXT STEP: REMOVE OBSERVER FROM LIST OF OBSERVERS TO GET RID OF CURRENT CHART AND CREATE NEW ONE.
+        // HOW? IF THE OBSERVER LIST IS NOT EMPTY, REMOVE WHAT EVER IS IN THERE VIA searchSubject.removeObserver(valUpdater);
+        // AND THEN GO FORTH IN ADDING A NEW ONE. THIS CONDITIONAL MAY HAVE TO NEST THE CURRENT CLICK LISTENER LAMBDA FUNCTION.
 
-
-//        TextfieldSubject searchSubject = new TextfieldSubject();
-//        ValueUpdater searchValUpdater = new ValueUpdater();
-//        searchSubject.addObserver(searchValUpdater);
-//        searchButton.addClickListener(e -> {
-//            searchSubject.setValue(stockTickerTF.getValue(), rangeWidthTF.getValue(), minDateTF.getValue(), maxDateTF.getValue());
-//            currChart.setVisible(true);
-//            conf.setTitle(stockTickerTF.getValue());
-//            conf.setSubTitle(rangeWidthTF.getValue());
-//        });
     }
+
+    private void addToFavorites() {
+        favoriteButton.addClickListener(e -> {
+//            Client newFavorite = new Client(this.ticker, this.minYear, this.maxYear, String.valueOf(this.lastOpenPrice), String.valueOf(this.maxHighPrice), String.valueOf(this.maxLowPrice));
+            FavoritesView f = new FavoritesView();
+        });
+    }
+
     private Component createHighlight(String title, String value, Double percentage) {
         VaadinIcon icon = VaadinIcon.ARROW_UP;
         String prefix = "";
         String theme = "badge";
 
         if (percentage == 0) {
-            prefix = "±";
+            prefix = "± $";
         } else if (percentage > 0) {
-            prefix = "+";
+            prefix = "+ $";
             theme += " success";
         } else if (percentage < 0) {
             icon = VaadinIcon.ARROW_DOWN;
@@ -176,7 +233,7 @@ public class SearchView extends Main {
         Icon i = icon.create();
         i.addClassNames(BoxSizing.BORDER, Padding.XSMALL);
 
-        Span badge = new Span(i, new Span(prefix + percentage.toString()));
+        Span badge = new Span(i, new Span(prefix + percentage));
         badge.getElement().getThemeList().add(theme);
 
         VerticalLayout layout = new VerticalLayout(h2, span, badge);
@@ -207,23 +264,20 @@ public class SearchView extends Main {
         return layout;
     }
 
-    private Component createViewEvents() {
-        // Header
-        Select year = new Select();
-        year.setItems("2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021");
-        year.setValue("Max Year");
-        year.setWidth("200px");
+    private Component createViewEvents(ArrayList<Double> openPricesList) {
+//    private Component createViewEvents(ArrayList<Double> openPricesList, JSONArray responseList) {
 
         HorizontalLayout header = createHeader("Chart","");
-        header.add(year);
 
         // Chart
         Chart chart = new Chart(ChartType.AREASPLINE);
+//        Chart chart = new Chart(ChartType.CANDLESTICK);
         Configuration conf = chart.getConfiguration();
+
         conf.getChart().setStyledMode(true);
 
         XAxis xAxis = new XAxis();
-//        xAxis.setCategories("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
+        xAxis.setCategories("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
         conf.addxAxis(xAxis);
 
         conf.getyAxis().setTitle("Price (USD)");
@@ -236,16 +290,47 @@ public class SearchView extends Main {
 
         // add a new stock to the list series that will appear as a chart and a little icon below chart on web app.
         // How to add a basic one: conf.addSeries(new ListSeries("test", 189.1, 191.1, 291.4, 396, 501, 403, 609, 712, 729, 942, 1044, 1247));
-        ListSeries temp = new ListSeries(ticker);
+        ListSeries tempChart = new ListSeries(ticker);
+        // Customize the background color of the chart
+        conf.getChart().setBackgroundColor(new SolidColor("#223348"));
+        /* -- for the candlestick chart delete if don't want candlestick chart
+        DataSeries dataSeries = new DataSeries();
+        PlotOptionsCandlestick plotOptionsCandlestick = new PlotOptionsCandlestick();
+        DataGrouping grouping = new DataGrouping();
+        grouping.addUnit(new TimeUnitMultiples(TimeUnit.WEEK, 1));
+        grouping.addUnit(new TimeUnitMultiples(TimeUnit.MONTH, 1, 2, 3, 4, 6));
+        plotOptionsCandlestick.setDataGrouping(grouping);
+        dataSeries.setPlotOptions(plotOptionsCandlestick);
 
-        for(int i = 0; i<openPricesList.size(); i++) {
-            temp.addData(openPricesList.get(i));
+
+        // for (data in openPricesList) in java
+        OhlcItem item;
+        for(int i = 0; i < responseList.length(); i++) {
+            item = new OhlcItem();
+            // set each instance of "l" in responseList to Low in the chart
+            item.setLow(responseList.getJSONObject(i).getDouble("l"));
+            item.setHigh(responseList.getJSONObject(i).getDouble("h"));
+            item.setOpen(responseList.getJSONObject(i).getDouble("o"));
+            item.setClose(responseList.getJSONObject(i).getDouble("c"));
+*/
+        for(int i = 0; i < openPricesList.size(); i++) {
+            tempChart.addData(openPricesList.get(i));
         }
-        stockChartList = new ArrayList<ListSeries>();
-        stockChartList.add(temp);
-        for(int i=0; i<stockChartList.size(); i++) {
+        /*
+        conf.setSeries(dataSeries);
+        RangeSelector rangeSelector = new RangeSelector();
+        rangeSelector.setSelected(4);
+        conf.setRangeSelector(rangeSelector);
+
+        chart.setTimeline(true);
+        add(chart);*/
+
+        ArrayList<ListSeries> stockChartList = new ArrayList<ListSeries>();
+        stockChartList.add(tempChart);
+        for(int i = 0; i< stockChartList.size(); i++) {
             conf.addSeries(stockChartList.get(i));
         }
+        System.out.println(stockChartList.get(0));
 
         // Add it all together
         VerticalLayout viewEvents = new VerticalLayout(header, chart);
@@ -256,7 +341,6 @@ public class SearchView extends Main {
         return viewEvents;
     }
 
-    /*
     private Component createServiceHealth() {
         // Header
         HorizontalLayout header = createHeader("Service health", "Input / output");
@@ -318,7 +402,7 @@ public class SearchView extends Main {
         serviceHealth.getElement().getThemeList().add("spacing-l");
         return serviceHealth;
     }
-    */
+
     private HorizontalLayout createHeader(String title, String subtitle) {
         H2 h2 = new H2(title);
         h2.addClassNames(FontSize.XLARGE, Margin.NONE);
@@ -364,4 +448,24 @@ public class SearchView extends Main {
         return theme;
     }
 
+    public static String unixConverter(Long unixTimestampStr) {
+        // Convert Unix timestamp String to long
+        long unixTimestamp = unixTimestampStr;
+
+        // Convert Unix timestamp to Date object
+        Date date = new Date(unixTimestamp);
+
+        // Create a TimeZone object for EST (Eastern Standard Time)
+        TimeZone estTimeZone = TimeZone.getTimeZone("America/New_York");
+
+        // Set the TimeZone of the Date object to EST
+        date.setTime(date.getTime() + estTimeZone.getRawOffset());
+
+        // Format the Date object to a string in the desired format
+        // You can use SimpleDateFormat or DateTimeFormatter for custom formatting
+        String formattedDate = date.toString();
+
+        // Return the formatted date
+        return formattedDate;
+    }
 }

@@ -1,4 +1,4 @@
-package com.example.application.views.trending;
+package com.example.application.views.favorites;
 
 public class Client {
 

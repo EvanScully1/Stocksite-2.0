@@ -3,10 +3,10 @@ package com.example.application.views;
 import com.example.application.data.User;
 import com.example.application.security.AuthenticatedUser;
 import com.example.application.views.blank.BlankView;
-import com.example.application.views.feed.FeedView;
+//import com.example.application.views.feed.FeedView;
 import com.example.application.views.login.LoginView;
 import com.example.application.views.search.SearchView;
-import com.example.application.views.trending.TrendingView;
+import com.example.application.views.favorites.FavoritesView;
 import com.example.application.views.userdatabase.UserDatabaseView;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.applayout.AppLayout;
@@ -159,11 +159,11 @@ public class MainLayout extends AppLayout {
         return new MenuItemInfo[]{ //
                 new MenuItemInfo("Search", LineAwesomeIcon.CHART_AREA_SOLID.create(), SearchView.class), //
 
-                new MenuItemInfo("Feed", LineAwesomeIcon.PENCIL_RULER_SOLID.create(), FeedView.class), //
+//                new MenuItemInfo("IDK YET", LineAwesomeIcon.PENCIL_RULER_SOLID.create(), FeedView.class), //
 
-                new MenuItemInfo("Trending", LineAwesomeIcon.TH_SOLID.create(), TrendingView.class), //
+                new MenuItemInfo("Favorites", LineAwesomeIcon.HEART.create(), FavoritesView.class), //
 
-                new MenuItemInfo("Blank", LineAwesomeIcon.PENCIL_RULER_SOLID.create(), BlankView.class), //
+                new MenuItemInfo("Game", LineAwesomeIcon.SELLCAST.create(), BlankView.class), //
 
                 new MenuItemInfo("Login", LineAwesomeIcon.USER.create(), LoginView.class), //
 

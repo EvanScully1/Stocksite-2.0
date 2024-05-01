@@ -1,4 +1,4 @@
-package com.example.application.views.trending;
+package com.example.application.views.favorites;
 
 import com.example.application.views.MainLayout;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -33,7 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 @PageTitle("Trending")
 @Route(value = "data-grid", layout = MainLayout.class)
 @AnonymousAllowed
-public class TrendingView extends Div {
+public class FavoritesView extends Div {
 
     private GridPro<Client> grid;
     private GridListDataView<Client> gridListDataView;
@@ -43,7 +43,7 @@ public class TrendingView extends Div {
     private Grid.Column<Client> statusColumn;
     private Grid.Column<Client> dateColumn;
 
-    public TrendingView() {
+    public FavoritesView() {
         addClassName("trending-view");
         setSizeFull();
         createGrid();
@@ -53,7 +53,7 @@ public class TrendingView extends Div {
     private void createGrid() {
         createGridComponent();
         addColumnsToGrid();
-        addFiltersToGrid();
+//        addFiltersToGrid();
     }
 
     private void createGridComponent() {
@@ -68,9 +68,9 @@ public class TrendingView extends Div {
 
     private void addColumnsToGrid() {
         createClientColumn();
-        createAmountColumn();
-        createStatusColumn();
+        createPriceColumn();
         createDateColumn();
+        createStatusColumn();
     }
 
     private void createClientColumn() {
@@ -83,15 +83,25 @@ public class TrendingView extends Div {
             span.setText(client.getClient());
             hl.add(img, span);
             return hl;
-        })).setComparator(client -> client.getClient()).setHeader("Client");
+        })).setComparator(client -> client.getClient()).setHeader("Ticker Symbol");
     }
 
-    private void createAmountColumn() {
+    private void createPriceColumn() {
         amountColumn = grid
                 .addEditColumn(Client::getAmount,
                         new NumberRenderer<>(client -> client.getAmount(), NumberFormat.getCurrencyInstance(Locale.US)))
                 .text((item, newValue) -> item.setAmount(Double.parseDouble(newValue)))
-                .setComparator(client -> client.getAmount()).setHeader("Amount");
+                .setComparator(client -> client.getAmount()).setHeader("Last Open");
+        amountColumn = grid
+                .addEditColumn(Client::getAmount,
+                        new NumberRenderer<>(client -> client.getAmount(), NumberFormat.getCurrencyInstance(Locale.US)))
+                .text((item, newValue) -> item.setAmount(Double.parseDouble(newValue)))
+                .setComparator(client -> client.getAmount()).setHeader("High");
+        amountColumn = grid
+                .addEditColumn(Client::getAmount,
+                        new NumberRenderer<>(client -> client.getAmount(), NumberFormat.getCurrencyInstance(Locale.US)))
+                .text((item, newValue) -> item.setAmount(Double.parseDouble(newValue)))
+                .setComparator(client -> client.getAmount()).setHeader("Low");
     }
 
     private void createStatusColumn() {
@@ -107,8 +117,12 @@ public class TrendingView extends Div {
     private void createDateColumn() {
         dateColumn = grid
                 .addColumn(new LocalDateRenderer<>(client -> LocalDate.parse(client.getDate()),
-                        () -> DateTimeFormatter.ofPattern("M/d/yyyy")))
-                .setComparator(client -> client.getDate()).setHeader("Date").setWidth("180px").setFlexGrow(0);
+                        () -> DateTimeFormatter.ofPattern("yyyy")))
+                .setComparator(client -> client.getDate()).setHeader("Min Year").setWidth("150px").setFlexGrow(0);
+        dateColumn = grid
+                .addColumn(new LocalDateRenderer<>(client -> LocalDate.parse(client.getDate()),
+                        () -> DateTimeFormatter.ofPattern("yyyy")))
+                .setComparator(client -> client.getDate()).setHeader("Max Year").setWidth("150px").setFlexGrow(0);
     }
 
     private void addFiltersToGrid() {

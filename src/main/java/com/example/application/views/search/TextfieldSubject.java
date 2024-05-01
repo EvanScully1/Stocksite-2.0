@@ -6,18 +6,20 @@ import java.util.List;
 
 public class TextfieldSubject implements Subject {
     private List<Observer> observers = new ArrayList<>();
-    private String tickerVal;
-    private String rangeW;
-    private String minDate;
-    private String maxDate;
+    protected String tickerVal;
+    protected String minYear;
+    protected String maxYear;
+//    private String rangeW;
+//    private String minDate;
+//    private String maxDate;
 
-    public void setValue(String tickerVal, String rangeW, String minDate, String maxDate) {
+    public void setValue(String tickerVal, String minYear, String maxYear) {
         this.tickerVal = tickerVal;
-        this.rangeW = rangeW;
-        this.minDate = minDate;
-        this.maxDate = maxDate;
+        this.minYear = minYear;
+        this.maxYear = maxYear;
+//        this.rangeW = rangeW;
 
-        notifyObservers(tickerVal, rangeW, minDate, maxDate);
+        notifyObservers(this.tickerVal, this.minYear, this.maxYear);
     }
 
     @Override
@@ -31,9 +33,9 @@ public class TextfieldSubject implements Subject {
     }
 
     @Override
-    public void notifyObservers(String tickerVal, String rangeW, String minDate, String maxDate) {
+    public void notifyObservers(String tickerVal, String minYear, String maxYear) {
         for (Observer observer : observers) {
-            observer.update(tickerVal, rangeW, minDate, maxDate);
+            observer.update(tickerVal, minYear, maxYear);
         }
     }
 }
